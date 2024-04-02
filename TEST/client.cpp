@@ -1,12 +1,7 @@
 #include <iostream>
-#include <cstdlib>
 #include <cstring>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <ctime>
 #include <termios.h>
 #include <fcntl.h>
 
