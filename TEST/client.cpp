@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <ctime>
+#include <termios.h>
+#include <fcntl.h>
 
 class TCPClient {
 private:
@@ -29,7 +31,17 @@ public:
             return;
         }
 
+        sendClientMessage("Starting the client " + clientName); // Отправляем сообщение на сервер
+
         while (true) {
+            if (kbhit()) {
+                char c = getchar();
+                if (c == 'q') {
+                    sendClientMessage("Shutting down the client " + clientName); // Отправляем сообщение на сервер
+                    break;
+                }
+            }
+
             sendMessage();
             sleep(connectionPeriod);
         }
@@ -69,6 +81,45 @@ private:
 
         std::string message = timeStr + std::string(" ") + clientName + "\n";
         send(clientSocket, message.c_str(), message.size(), 0);
+    }
+
+    void sendClientMessage(const std::string& message) {
+        std::string formattedMessage = "[" + getCurrentTime() + "] " + message + "\n";
+        std::cout << formattedMessage << std::endl; // Выводим сообщение в консоль клиента
+        send(clientSocket, formattedMessage.c_str(), formattedMessage.size(), 0); // Отправляем сообщение на сервер
+    }
+
+    std::string getCurrentTime() {
+        time_t now = time(0);
+        tm* localTime = localtime(&now);
+        char timeStr[64];
+        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", localTime);
+        return std::string(timeStr);
+    }
+
+    int kbhit() {
+        struct termios oldt, newt;
+        int ch;
+        int oldf;
+
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO);
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+        fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+        ch = getchar();
+
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+        fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+        if (ch != EOF) {
+            ungetc(ch, stdin);
+            return 1;
+        }
+
+        return 0;
     }
 };
 
