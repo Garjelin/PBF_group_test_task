@@ -94,10 +94,12 @@ void TCPServer::clientHandler(int clientSocket) {
         // Запись в лог
         logMutex.lock();
         logQueue.push(std::string(buffer)); // Добавляем данные в очередь
+        logFile.flush();
         logMutex.unlock();
     }
     close(clientSocket);
 }
+
 
 void TCPServer::acceptConnections() {
     struct sockaddr_in clientAddr;

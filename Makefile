@@ -2,9 +2,9 @@ CC := g++
 CFLAGS := -Wall -Werror -Wextra -std=c++11
 DBG := -g
 
-all: server client
+all: clean server client
 
-server:
+server: 
 	$(CC) $(CFLAGS) server.cpp -o server $(DBG)
 
 client:
