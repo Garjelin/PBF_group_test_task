@@ -19,10 +19,7 @@ class TCPServer {
     bool initServer();
     bool startListening();
     void clientHandler(int clientSocket);
-    void waitForIncomingConnection();
-    void setupSelector(fd_set& readfds, struct timeval& timeout);
-    bool hasIncomingConnection();
-    int acceptConnection();
+    void acceptConnections();
     void logWorker();
     void inputHandler();
     int kbhit();
@@ -86,68 +83,46 @@ bool TCPServer::startListening() {
 
 void TCPServer::clientHandler(int clientSocket) {
     char buffer[1024];
+
     while (true) {
-        // Получение данных от клиента
         int bytesReceived = recv(clientSocket, buffer, sizeof(buffer), 0);
-        if (bytesReceived <= 0) break;
-        buffer[bytesReceived] = '\0';
-        // Захват мьютекса для безопасного добавления данных в очередь
+        if (bytesReceived <= 0)
+            break;
+
+        buffer[bytesReceived] = '\0'; // Добавляем завершающий нуль-символ
+
+        // Запись в лог
         logMutex.lock();
-        // Добавление данных в очередь
-        logQueue.push(std::string(buffer));
-        // Освобождение мьютекса
+        logQueue.push(std::string(buffer)); // Добавляем данные в очередь
         logMutex.unlock();
     }
-    // Закрытие сокета клиента
     close(clientSocket);
 }
 
-
-void TCPServer::setupSelector(fd_set& readfds, struct timeval& timeout) {
-    // Очистка множества файловых дескрипторов и установка серверного сокета в множество
-    FD_ZERO(&readfds);
-    FD_SET(serverSocket, &readfds);
-    // Установка таймаута для ожидания событий
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 10000;
-}
-
-bool TCPServer::hasIncomingConnection() {
-    fd_set readfds;
-    FD_ZERO(&readfds);
-    FD_SET(serverSocket, &readfds);
-
-    // Проверка наличия входящего соединения с помощью select
-    struct timeval timeout;
-    timeout.tv_sec = 0;  
-    timeout.tv_usec = 10000;  
-    int ready = select(serverSocket + 1, &readfds, nullptr, nullptr, &timeout);
-
-    // Возвращаем true, если есть входящее соединение, иначе false
-    if (ready <= 0) return false;
-    return true;
-}
-
-int TCPServer::acceptConnection() {
+void TCPServer::acceptConnections() {
     struct sockaddr_in clientAddr;
     socklen_t clientAddrLen = sizeof(clientAddr);
-    // Принятие входящего соединения и возвращение сокета клиента
-    return accept(serverSocket, (struct sockaddr*)&clientAddr, &clientAddrLen);
-}
+    while (running) {
+        // Установка тайм-аута для accept с помощью select
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(serverSocket, &readfds);
+        struct timeval timeout;
+        timeout.tv_sec = 0;  // Установка тайм-аута на 0 секунд
+        timeout.tv_usec = 10000;  // Установка тайм-аута на 10 миллисекунд
 
-void TCPServer::waitForIncomingConnection() {
-    // Подготовка набора файловых дескрипторов для select
-    fd_set readfds;
-    struct timeval timeout;
-    setupSelector(readfds, timeout);
+        int ready = select(serverSocket + 1, &readfds, nullptr, nullptr, &timeout);
+        if (ready > 0) {
+            int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientAddrLen);
+            if (clientSocket == -1) {
+                //std::cerr << "Failed to accept connection." << std::endl;
+                continue;
+            }
 
-    // Ожидание входящего соединения
-    if (!hasIncomingConnection()) return;
-
-    // Принятие входящего соединения
-    int clientSocket = acceptConnection();
-    // Обработка клиента в новом потоке
-    if (clientSocket) clientHandler(clientSocket);
+            std::thread clientThread(&TCPServer::clientHandler, this, clientSocket);
+            clientThread.detach();
+        }
+    }
 }
 
 void TCPServer::logWorker() {
@@ -188,7 +163,7 @@ void TCPServer::inputHandler() {
     }
 }
 
-    // проверка нажатия клавиши на клавиатуре без блокирования основного потока выполнения программы
+    //проверка ввода на клавиатуре без блокирования основного потока
 int TCPServer::kbhit() {
     struct termios oldt, newt;
     int ch;
@@ -237,11 +212,7 @@ void TCPServer::start() {
     std::thread loggerThread(&TCPServer::logWorker, this);
     // создание потока логирования для обработки ввода пользователя с консоли
     std::thread inputThread(&TCPServer::inputHandler, this);
-    
-    // Запись входящих потоков
-    while (running) waitForIncomingConnection();
-    
-    // ожидание завершения выполнения потоков
+    acceptConnections();
     loggerThread.join();
     inputThread.join();
 }
@@ -250,6 +221,7 @@ void TCPServer::stop() {
     if (running) log("Shutting down the server");
 
     running = false;
+    // закрытие сокета
     close(serverSocket);
     if (logFile.is_open()) {
         logFile.close();
