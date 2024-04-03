@@ -7,6 +7,10 @@
 ## Приложение TCP сервер-клиент
 Это простое приложение TCP сервера и клиента, написанное на C++.
 
+## [Тех задание](https://github.com/Garjelin/PBF_group_test_task/blob/main/Technical_Specification.md/)
+
+### [Видеопрезентация](https://drive.google.com/file/d/16IUQTsT9eN8RROPjQyKOu068FuJpCaLB/view?usp=drive_link/)
+
 # Компиляция
 Убедитесь, что у вас установлен компилятор C++. Этот проект можно скомпилировать с помощью g++.
 ```
