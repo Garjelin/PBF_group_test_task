@@ -1,57 +1,30 @@
-CC = g++
-FLAG_C = -c
-FLAG_O = -o
-ASAN = -g -fsanitize=address
-FLAG_COV = --coverage
-FLAG_ER = -Wall -Werror -Wextra -std=c++11
-VALGRIND_FLAGS = --leak-check=full --show-leak-kinds=all --track-origins=yes
-FLAG_TESTS = -lcheck -lm -lgcov -lsubunit -lgtest -lgtest_main
+CC := g++
+CFLAGS := -Wall -Werror -Wextra -std=c++11
+DBG := -g
 
-OUTDIR = BUILD
-TESTDIR = TESTS
-LIBDIR = SERVER
-SUITE_CASES_CPP = main_*.cpp
-SUITE_CASES_O = main_*.o
+all: server client
 
-all: clean test
+server:
+	$(CC) $(CFLAGS) server.cpp -o server $(DBG)
 
-test:
-	rm -rf BUILD
-	mkdir BUILD
-	for file in $(TESTDIR)/$(SUITE_CASES_CPP); do \
-		$(CC) $(FLAG_C) $(FLAG_ER) $(FLAG_COV) $$file -o $(OUTDIR)/$$(basename $$file .cpp).o; \
-	done
-	$(CC) $(FLAG_ER) -o $(OUTDIR)/tests $(OUTDIR)/$(SUITE_CASES_O) $(FLAG_TESTS)
-	./$(OUTDIR)/tests server 3000
+client:
+	$(CC) $(CFLAGS) client.cpp -o client $(DBG)
 
-asan:
-	for file in $(TESTDIR)/$(SUITE_CASES_CPP); do \
-		$(CC) $(FLAG_C) $(FLAG_ER) $(FLAG_COV) $$file -o $(OUTDIR)/$$(basename $$file .cpp).o; \
-	done
-	$(CC) $(FLAG_ER) -o $(OUTDIR)/tests $(OUTDIR)/$(SUITE_CASES_O) $(FLAG_TESTS) $(ASAN)
-	./$(OUTDIR)/tests
+run_server:
+	@echo "Enter port number:"
+	@read port; \
+	echo "To quit, press 'q'"; \
+	./server $$port
 
-valgrind_test:
-	for file in $(TESTDIR)/$(SUITE_CASES_CPP); do \
-		$(CC) $(FLAG_C) $(FLAG_ER) $(FLAG_COV) $$file -o $(OUTDIR)/$$(basename $$file .cpp).o; \
-	done
-	$(CC) $(FLAG_ER) -o $(OUTDIR)/tests $(OUTDIR)/$(SUITE_CASES_O) $(FLAG_TESTS)
-	valgrind $(VALGRIND_FLAGS) ./$(OUTDIR)/tests
-
-cpp_check:
-	cppcheck --enable=all --force $(LIBDIR)/*.h $(LIBDIR)/*.cpp $(TESTDIR)/*.cpp
-
-style_check:
-	cp ../materials/linters/.clang-format ./
-	clang-format -n $(LIBDIR)/*.h $(LIBDIR)/*.cpp $(TESTDIR)/*.cpp
-	clang-format -i $(LIBDIR)/*.h $(LIBDIR)/*.cpp $(TESTDIR)/*.cpp
-	rm -rf .clang-format
+run_client:
+	@echo "Enter client name:"
+	@read client_name; \
+	echo "Enter server port:"; \
+	read server_port; \
+	echo "Enter connection period:"; \
+	read connection_period; \
+	echo "To quit, press 'q'"; \
+	./client $$client_name $$server_port $$connection_period
 
 clean:
-	-rm -rf BUILD
-	-rm -rf *.o *.html *.gcda *.gcno *.css *.a *.gcov *.info *.out *.cfg *.txt
-	-rm -f tests
-	-rm -f report
-	find . -type d -name 'tests.dSYM' -exec rm -r {} +
-
-
+	rm -rf server client log.txt
